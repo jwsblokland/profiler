@@ -33,8 +33,6 @@ module profiler
   
 contains
   !> \brief Initializes the profiler.
-  !!
-  !! \note Currently, the maximum number of watches has been set to a hundred.
   subroutine prof_init(name)
     character(len=*), intent(in) :: name  !< Name of the master watch.
 
@@ -148,10 +146,9 @@ contains
        line(i:i) = '-'
     end do
     
-    
     call date_and_time(values=values)
     write(time_str, '(i0.2, ":", i0.2, ":", i0.2)') values(5), values(6), values(7)
-    write(date_str ,'(i0.2, "-" ,i0.2, "-", i0.2)') values(3), values(2), values(1)
+    write(date_str ,'(i0,   " ", a,    " ", i0.2)') values(3), trim(month_name(values(2))), values(1)
     write(error_unit, '(a)') "Profiler information of the program " // trim(prof_mwatch%name)
     write(error_unit, '(a)') "Created on " // trim(date_str) // " at " // trim(time_str) 
     write(error_unit, '(a)')   ""
@@ -300,5 +297,17 @@ contains
 
     write(etime_str, '(f12.3, 1x, a3, 2x, a)') etime, 'sec', data_rate_str
   end function etime_str
+
+  !> \brief Returns the name of the month for a given month number.
+  function month_name(month_number) result(name)
+    integer(int32),   intent(in) :: month_number  !< Month number.
+    character(len=9)             :: name          !< Name of the month.
+
+    ! Parameters
+    character(len=9), dimension(12) :: names = [ 'January  ', 'February ', 'March    ', 'April    ', 'May      ', 'June     ',   &
+                                                 'July     ', 'Augustus ', 'September', 'October  ', 'November ', 'December ' ]
+
+    name = names(month_number)
+  end function month_name
 end module profiler
 
