@@ -1,5 +1,5 @@
 !> \brief Profiler module
-module profiler
+module profiler_module
   use, intrinsic :: iso_fortran_env,  only: int32, int64
   implicit none
 
@@ -28,13 +28,43 @@ module profiler
      integer(int32) :: etime_maxlen  !< Maximum string length needed to represent the elapsed time (including the data rate).
   end type props_t
   
-  type(watch_t), target,  save :: prof_mwatch            !< Master watch.
-  type(watch_t), pointer, save :: prof_cwatch => null()  !< Current watch.
+  !> \brief Derived type representing the profiler.
+  type, public :: profiler_t
+     type(watch_t)          :: mwatch            !< Master watch.
+     type(watch_t), pointer :: cwatch => null()  !< Current watch.
+  end type profiler_t
+
+  type(profiler_t), save :: prof_profiler  !< Profiler.
+
+  !> \brief Initializes the profiler.
+  interface prof_init
+     module procedure prof_init_own
+     module procedure prof_init_save
+  end interface prof_init
   
+  !> \brief ?
+  interface prof_tic
+     module procedure prof_tic_own
+     module procedure prof_tic_save
+  end interface prof_tic
+
+  !> \brief ?
+  interface prof_toc
+     module procedure prof_toc_own
+     module procedure prof_toc_save
+  end interface prof_toc
+
+  !> \brief ?
+  interface prof_report
+     module procedure prof_report_own
+     module procedure prof_report_save
+  end interface prof_report
+     
 contains
   !> \brief Initializes the profiler.
-  subroutine prof_init(name)
-    character(len=*), intent(in) :: name  !< Name of the master watch.
+  subroutine prof_init_own(profiler, name)
+    type(profiler_t), target, intent(inout) :: profiler  !< Profiler.
+    character(len=*),         intent(in)    :: name      !< Name of the master watch.
 
     ! Locals
     integer(int32) :: i, offset
@@ -47,39 +77,40 @@ contains
           exit
        end if
     end do
-    
-    prof_cwatch            => prof_mwatch
-    prof_cwatch%name       =  name(offset:)
-    prof_cwatch%generation =  prof_cwatch%generation + 1
-    prof_cwatch%nused      =  prof_cwatch%nused      + 1
-    call system_clock(count=prof_cwatch%start)
-  end subroutine prof_init
-  
+
+    profiler%cwatch            => profiler%mwatch
+    profiler%cwatch%name       =  name(offset:)
+    profiler%cwatch%generation =  profiler%cwatch%generation + 1
+    profiler%cwatch%nused      =  profiler%cwatch%nused      + 1
+    call system_clock(count=profiler%cwatch%start)
+  end subroutine prof_init_own
+
   !> \brief Profiler tic subroutine.
-  subroutine prof_tic(name, nunits, unit)
-    character(len=*),           intent(in) :: name    !< Name of the child watch.
-    integer(int64),   optional, intent(in) :: nunits  !< Number of units that will be used.
-    character(len=*), optional, intent(in) :: unit    !< Name of the unit.
+  subroutine prof_tic_own(profiler, name, nunits, unit)
+    type(profiler_t), target,   intent(inout) :: profiler  !< Profiler.
+    character(len=*),           intent(in)    :: name      !< Name of the child watch.
+    integer(int64),   optional, intent(in)    :: nunits    !< Number of units that will be used.
+    character(len=*), optional, intent(in)    :: unit      !< Name of the unit.
     
     ! Locals
     integer(int32)                       :: ichild, nchildren
     type(watch_t), dimension(:), pointer :: children
     
-    if (.not. associated(prof_cwatch%children)) then
+    if (.not. associated(profiler%cwatch%children)) then
        ! No children.
-       allocate(prof_cwatch%children(1))
-       prof_cwatch%children(1)%parent => prof_cwatch
-       prof_cwatch                    => prof_cwatch%children(1)
-       prof_cwatch%name               =  trim(name)
-       prof_cwatch%unit               =  trim(unit)
-       prof_cwatch%generation         =  prof_cwatch%parent%generation + 1
+       allocate(profiler%cwatch%children(1))
+       profiler%cwatch%children(1)%parent => profiler%cwatch
+       profiler%cwatch                    => profiler%cwatch%children(1)
+       profiler%cwatch%name               =  trim(name)
+       profiler%cwatch%unit               =  trim(unit)
+       profiler%cwatch%generation         =  profiler%cwatch%parent%generation + 1
     else
        ! Has children.
-       nchildren = size(prof_cwatch%children)
+       nchildren = size(profiler%cwatch%children)
        do ichild = 1, nchildren
-          if (trim(name) == trim(prof_cwatch%children(ichild)%name)) then
+          if (trim(name) == trim(profiler%cwatch%children(ichild)%name)) then
              ! Existing child watch found.
-             prof_cwatch => prof_cwatch%children(ichild)
+             profiler%cwatch => profiler%cwatch%children(ichild)
              exit
           end if
        end do
@@ -87,40 +118,44 @@ contains
        if (ichild > nchildren) then
           ! New child watch.
           allocate(children(nchildren + 1))
-          children(1:nchildren) = prof_cwatch%children
-          nullify(prof_cwatch%children)
-          prof_cwatch%children => children
+          children(1:nchildren) = profiler%cwatch%children
+          nullify(profiler%cwatch%children)
+          profiler%cwatch%children => children
           nullify(children)
 
           ! Set the parent of the new child watch.
-          prof_cwatch%children(nchildren + 1)%parent => prof_cwatch
+          profiler%cwatch%children(nchildren + 1)%parent => profiler%cwatch
 
-          prof_cwatch            => prof_cwatch%children(nchildren + 1)
-          prof_cwatch%name       =  trim(name)
-          prof_cwatch%unit       =  trim(unit)
-          prof_cwatch%generation =  prof_cwatch%parent%generation + 1
+          profiler%cwatch            => profiler%cwatch%children(nchildren + 1)
+          profiler%cwatch%name       =  trim(name)
+          profiler%cwatch%unit       =  trim(unit)
+          profiler%cwatch%generation =  profiler%cwatch%parent%generation + 1
        end if
     end if
     
-    prof_cwatch%nused = prof_cwatch%nused + 1
-    call system_clock(count=prof_cwatch%start)
-    if (present(nunits))  prof_cwatch%nunits = prof_cwatch%nunits + nunits
-  end subroutine prof_tic
+    profiler%cwatch%nused = profiler%cwatch%nused + 1
+    call system_clock(count=profiler%cwatch%start)
+    if (present(nunits))  profiler%cwatch%nunits = profiler%cwatch%nunits + nunits
+  end subroutine prof_tic_own
 
   !> \brief Profiler toc subroutine
-  subroutine prof_toc()
+  subroutine prof_toc_own(profiler)
+    type(profiler_t), target, intent(inout) :: profiler  !< Profiler.
+
     ! Locals
     integer(int64) :: end
 
     call system_clock(count=end)
-    prof_cwatch%etime =  prof_cwatch%etime + (end - prof_cwatch%start)
-    prof_cwatch       => prof_cwatch%parent
-  end subroutine prof_toc
-  
+    profiler%cwatch%etime =  profiler%cwatch%etime + (end - profiler%cwatch%start)
+    profiler%cwatch       => profiler%cwatch%parent
+  end subroutine prof_toc_own
+
   !> \brief Prints a report of the profiling results.
-  subroutine prof_report()
+  subroutine prof_report_own(profiler)
     use, intrinsic :: iso_fortran_env,  only: int64, real64, error_unit
-    
+
+    type(profiler_t), target, intent(inout) :: profiler  !< Profiler.
+   
     ! Locals
     integer(int64)               :: end, count_rate, i
     character(len=60)            :: fmt, time_str, date_str
@@ -128,28 +163,27 @@ contains
     integer(int32), dimension(8) :: values
     type(props_t)                :: props
 
-    if (associated(prof_cwatch%parent)) then
+    if (associated(profiler%cwatch%parent)) then
        write(error_unit, '(A)') "ERROR: Unbalanced prof_tic and prof_toc combinations."
        return
     end if
-    nullify(prof_cwatch)
+    nullify(profiler%cwatch)
     
     ! Current watch is the master watch.
     call system_clock(count=end, count_rate=count_rate)
-    prof_mwatch%etime = prof_mwatch%etime + (end - prof_mwatch%start)
+    profiler%mwatch%etime = profiler%mwatch%etime + (end - profiler%mwatch%start)
 
     ! Layout properties.
-    call prof_layout_props(prof_mwatch, props)
-
-    ! Write report header.
-    do i=1,255
-       line(i:i) = '-'
-    end do
-    
+    call prof_layout_props(profiler%mwatch, props)
     call date_and_time(values=values)
     write(time_str, '(i0.2, ":", i0.2, ":", i0.2)') values(5), values(6), values(7)
     write(date_str ,'(i0,   " ", a,    " ", i0.2)') values(3), trim(month_name(values(2))), values(1)
-    write(error_unit, '(a)') "Profiler information of the program " // trim(prof_mwatch%name)
+    do i=1,len(line)
+       line(i:i) = '-'
+    end do
+
+    ! Write report header.
+    write(error_unit, '(a)') "Profiler information of the program " // trim(profiler%mwatch%name)
     write(error_unit, '(a)') "Created on " // trim(date_str) // " at " // trim(time_str) 
     write(error_unit, '(a)')   ""
     write(fmt, '("(a5, ", i0, "x, a4, ", i0, "x, 2x, a)")') props%count_maxlen - 5 + 4, props%name_maxlen - 4
@@ -158,12 +192,38 @@ contains
     write(error_unit, fmt)     line
     
     write(fmt, '("(", i0, "x, a", i0, ", ", i0, "x, a)")')  &
-         props%count_maxlen + 4, len_trim(prof_mwatch%name), props%name_maxlen - len_trim(prof_mwatch%name)+ 2
-    write(error_unit, fmt) prof_mwatch%name, etime_str(prof_mwatch)
-    if (associated(prof_mwatch%children)) then
-       call prof_summary_family(prof_mwatch, props)
+         props%count_maxlen + 4, len_trim(profiler%mwatch%name), props%name_maxlen - len_trim(profiler%mwatch%name)+ 2
+    write(error_unit, fmt) profiler%mwatch%name, etime_str(profiler%mwatch)
+    if (associated(profiler%mwatch%children)) then
+       call prof_summary_family(profiler%mwatch, props)
     end if
-  end subroutine prof_report
+  end subroutine prof_report_own
+
+  !> \brief Initializes the profiler.
+  subroutine prof_init_save(name)
+    character(len=*), intent(in) :: name  !< Name of the master watch.
+
+    call prof_init_own(prof_profiler, name)
+  end subroutine prof_init_save
+  
+  !> \brief Profiler tic subroutine.
+  subroutine prof_tic_save(name, nunits, unit)
+    character(len=*),           intent(in) :: name    !< Name of the child watch.
+    integer(int64),   optional, intent(in) :: nunits  !< Number of units that will be used.
+    character(len=*), optional, intent(in) :: unit    !< Name of the unit.
+    
+    call prof_tic_own(prof_profiler, name, nunits, unit)
+  end subroutine prof_tic_save
+
+  !> \brief Profiler toc subroutine
+  subroutine prof_toc_save()
+    call prof_toc_own(prof_profiler)
+  end subroutine prof_toc_save
+  
+  !> \brief Prints a report of the profiling results.
+  subroutine prof_report_save()
+    call prof_report_own(prof_profiler)
+  end subroutine prof_report_save
 
   !> \brief Determines the layout properties of the report.
   subroutine prof_layout_props(mwatch, props)
@@ -309,5 +369,5 @@ contains
 
     name = names(month_number)
   end function month_name
-end module profiler
+end module profiler_module
 
