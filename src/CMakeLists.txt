@@ -1,24 +1,37 @@
-cmake_minimum_required(VERSION 3.0)
+# Profiler library
+set(PROF_SRCDIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(PROF_SRC profiler.f90)
 
-# Project settings
-project(profiler VERSION 0.1.0 LANGUAGES Fortran)
-set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/profiles-${PROJECT_VERSION})
-
-# Fortan settings
-set(CMAKE_Fortran_STANDARD 2008)
-set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules CACHE PATH "Single directory for all Fortran modules.")
-if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
-  message("GNU")
-  set(CMAKE_Fortran_FLAGS_RELEASE "-std=f2008 -O3")
-  set(CMAKE_Fortran_FLAGS_DEBUG   "-std=f2008 -O0 -Wall -fbounds-check")
-elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
-  message("Intel")
-  set(CMAKE_Fortran_FLAGS_RELEASE "-O3")
-  set(CMAKE_Fortran_FLAGS_DEBUG   "-O0 -warn all -check all")
-endif ()
-
-list(APPEND PROF_SRC profiler.f90)
-
-add_executable(profiler program.f90 ${PROF_SRC})
+add_library(profiler STATIC ${PROF_SRC})
 install(TARGETS profiler
-        RUNTIME DESTINATION bin)
+        ARCHIVE DESTINATION lib)
+install(FILES ${CMAKE_Fortran_MODULE_DIRECTORY}/profiler.mod
+        DESTINATION include)
+
+if (BUILD_DOC)
+  # Set input and output file.
+  set(DOXYGEN_IN  ${PROF_SRCDIR}/Doxyfile.in)
+  set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
+
+  if (BUILD_DOC_INTERNAL)
+    set(HIDE_UNDOC_MEMBERS YES)
+    set(HIDE_UNDOC_CLASSES YES)
+    set(ENABLED_SECTIONS   _INTERNAL_)
+  else ()
+    set(HIDE_UNDOC_MEMBERS NO)
+    set(HIDE_UNDOC_CLASSES NO)
+    set(ENABLED_SECTION)
+  endif ()
+
+  # Configure the doxygen file.
+  configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
+
+  add_custom_target(api_doc ALL
+                    COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
+                    WORKING DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+                    COMMENT "Generating API documentation with Doxygen"
+                    VERBATIM)
+  install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/html/
+          DESTINATION doc)
+endif ()
+ 
