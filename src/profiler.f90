@@ -1,5 +1,5 @@
 !> \brief Profiler module
-module profiler_module
+module profiler
   use, intrinsic :: iso_fortran_env,  only: int32, int64
   implicit none
 
@@ -7,7 +7,8 @@ module profiler_module
   public  :: prof_init, prof_tic, prof_toc, prof_report
 
   integer(int32), parameter :: STR_LEN = 40  !< Length of a string.
-  
+
+  !> \cond _INTERNAL_
   !> \brief Derived type representing a watch.
   type :: watch_t
      type(watch_t),          pointer               :: parent     => null()  !< Parent watch.
@@ -20,50 +21,57 @@ module profiler_module
      character(len=STR_LEN)                        :: unit       = ''       !< Base name of the unit.
      integer(int64)                                :: nunits     =  0       !< Sum of the number of units that have been used.
   end type watch_t
+  !> \endcond
 
+  !> \cond _INTERNAL_
   !> \brief Layout properties of the report.
   type :: props_t
      integer(int32) :: count_maxlen  !< Maximum string length needed to represent the maximum number how many time a watch has been used.
      integer(int32) :: name_maxlen   !< Maximum string length needed to represent the name of the watch (including the generation offset).
      integer(int32) :: etime_maxlen  !< Maximum string length needed to represent the elapsed time (including the data rate).
   end type props_t
+  !> \endcond
   
   !> \brief Derived type representing the profiler.
-  type, public :: profiler_t
+  type, public :: prof_t
      type(watch_t)          :: mwatch            !< Master watch.
      type(watch_t), pointer :: cwatch => null()  !< Current watch.
-  end type profiler_t
+  end type prof_t
 
-  type(profiler_t), save :: prof_profiler  !< Profiler.
-
+  !> \cond _INTERNAL_
+  type(prof_t), save :: prof_profiler  !< Internal profiler object.
+  !> \endcond
+  
   !> \brief Initializes the profiler.
   interface prof_init
-     module procedure prof_init_own
-     module procedure prof_init_save
+     module procedure prof_init_external
+     module procedure prof_init_internal
   end interface prof_init
   
-  !> \brief ?
+  !> \brief Profiler tic subroutine.
   interface prof_tic
-     module procedure prof_tic_own
-     module procedure prof_tic_save
+     module procedure prof_tic_external
+     module procedure prof_tic_internal
   end interface prof_tic
 
-  !> \brief ?
+  !> \brief Profiler toc subroutine.
   interface prof_toc
-     module procedure prof_toc_own
-     module procedure prof_toc_save
+     module procedure prof_toc_external
+     module procedure prof_toc_internal
   end interface prof_toc
 
   !> \brief Prints a report of the profiling results.
   interface prof_report
-     module procedure prof_report_own
-     module procedure prof_report_save
+     module procedure prof_report_external
+     module procedure prof_report_internal
   end interface prof_report
      
 contains
   !> \brief Initializes the profiler.
-  subroutine prof_init_own(profiler, name)
-    type(profiler_t), target, intent(inout) :: profiler  !< Profiler.
+  !!
+  !> \warning The variable \em name should not exceed 40 characters otherwise it will be truncated.
+  subroutine prof_init_external(profiler, name)
+    type(prof_t),     target, intent(inout) :: profiler  !< Profiler.
     character(len=*),         intent(in)    :: name      !< Name of the master watch.
 
     ! Locals
@@ -83,13 +91,14 @@ contains
     profiler%cwatch%generation =  profiler%cwatch%generation + 1
     profiler%cwatch%nused      =  profiler%cwatch%nused      + 1
     call system_clock(count=profiler%cwatch%start)
-  end subroutine prof_init_own
+  end subroutine prof_init_external
 
   !> \brief Profiler tic subroutine.
   !!
+  !> \warning The variable \em name should not exceed 40 characters otherwise it will be truncated.
   !> \warning No check on base name of the unit will be performed for an existing name.
-  subroutine prof_tic_own(profiler, name, nunits, unit)
-    type(profiler_t), target,   intent(inout) :: profiler  !< Profiler.
+  subroutine prof_tic_external(profiler, name, nunits, unit)
+    type(prof_t),     target,   intent(inout) :: profiler  !< Profiler.
     character(len=*),           intent(in)    :: name      !< Name of the child watch.
     integer(int64),   optional, intent(in)    :: nunits    !< Number of units that will be used.
     character(len=*), optional, intent(in)    :: unit      !< Base name of the unit.
@@ -138,11 +147,11 @@ contains
     profiler%cwatch%nused = profiler%cwatch%nused + 1
     call system_clock(count=profiler%cwatch%start)
     if (present(nunits))  profiler%cwatch%nunits = profiler%cwatch%nunits + nunits
-  end subroutine prof_tic_own
+  end subroutine prof_tic_external
 
   !> \brief Profiler toc subroutine
-  subroutine prof_toc_own(profiler)
-    type(profiler_t), target, intent(inout) :: profiler  !< Profiler.
+  subroutine prof_toc_external(profiler)
+    type(prof_t), target, intent(inout) :: profiler  !< Profiler.
 
     ! Locals
     integer(int64) :: end
@@ -150,13 +159,13 @@ contains
     call system_clock(count=end)
     profiler%cwatch%etime =  profiler%cwatch%etime + (end - profiler%cwatch%start)
     profiler%cwatch       => profiler%cwatch%parent
-  end subroutine prof_toc_own
+  end subroutine prof_toc_external
 
   !> \brief Prints a report of the profiling results.
-  subroutine prof_report_own(profiler)
+  subroutine prof_report_external(profiler)
     use, intrinsic :: iso_fortran_env,  only: int64, real64, error_unit
 
-    type(profiler_t), target, intent(inout) :: profiler  !< Profiler.
+    type(prof_t), target, intent(inout) :: profiler  !< Profiler.
    
     ! Locals
     integer(int64)               :: end, count_rate, i
@@ -199,34 +208,45 @@ contains
     if (associated(profiler%mwatch%children)) then
        call prof_summary_family(profiler%mwatch, props)
     end if
-  end subroutine prof_report_own
+  end subroutine prof_report_external
 
   !> \brief Initializes the profiler.
-  subroutine prof_init_save(name)
+  !!
+  !> \warning The variable \em name should not exceed 40 characters otherwise it will be truncated.
+  !> \note    It makes use of the internally defined profiler variable.
+  subroutine prof_init_internal(name)
     character(len=*), intent(in) :: name  !< Name of the master watch.
 
-    call prof_init_own(prof_profiler, name)
-  end subroutine prof_init_save
+    call prof_init_external(prof_profiler, name)
+  end subroutine prof_init_internal
   
   !> \brief Profiler tic subroutine.
-  subroutine prof_tic_save(name, nunits, unit)
+  !!
+  !> \warning The variable \em name should not exceed 40 characters otherwise it will be truncated.
+  !> \note    It makes use of the internally defined profiler variable.
+  subroutine prof_tic_internal(name, nunits, unit)
     character(len=*),           intent(in) :: name    !< Name of the child watch.
     integer(int64),   optional, intent(in) :: nunits  !< Number of units that will be used.
     character(len=*), optional, intent(in) :: unit    !< Name of the unit.
     
-    call prof_tic_own(prof_profiler, name, nunits, unit)
-  end subroutine prof_tic_save
+    call prof_tic_external(prof_profiler, name, nunits, unit)
+  end subroutine prof_tic_internal
 
   !> \brief Profiler toc subroutine
-  subroutine prof_toc_save()
-    call prof_toc_own(prof_profiler)
-  end subroutine prof_toc_save
+  !!
+  !> \note It makes use of the internally defined profiler variable.
+  subroutine prof_toc_internal()
+    call prof_toc_external(prof_profiler)
+  end subroutine prof_toc_internal
   
   !> \brief Prints a report of the profiling results.
-  subroutine prof_report_save()
-    call prof_report_own(prof_profiler)
-  end subroutine prof_report_save
+  !!
+  !> \note It makes use of the internally defined profiler variable.
+  subroutine prof_report_internal()
+    call prof_report_external(prof_profiler)
+  end subroutine prof_report_internal
 
+  !> \cond _INTERNAL_
   !> \brief Determines the layout properties of the report.
   subroutine prof_layout_props(mwatch, props)
     use, intrinsic :: iso_fortran_env,  only: int64
@@ -371,4 +391,5 @@ contains
 
     name = names(month_number)
   end function month_name
-end module profiler_module
+  !> \endcond
+end module profiler

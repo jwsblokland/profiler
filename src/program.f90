@@ -1,6 +1,6 @@
 program program
   use, intrinsic :: iso_fortran_env
-  use            :: profiler_module
+  use            :: profiler
   implicit none
 
   integer(int32)     :: i

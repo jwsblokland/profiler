@@ -1,0 +1,94 @@
+/**
+ * \mainpage Profiler library
+ *
+ * The main purpose of this profiler library is the easily profile an application or library without using a
+ * true profiler application, like gprof.
+ *
+ * \section start  Getting started
+ * \subsection module  Environment module
+ * PROFILER_ROOT, PROFILER_INCLUDE
+ * \subsection cmake  CMake
+ *
+ * \section snippets  Code snippets
+ * In thi section we will show how to use the profiler library in two code snippets. These snippets
+ * are exactly the same expect for the usage of the profiler variable. The first one makes use of
+ * the internal one, while the second one defined its own profiler variable.
+ *
+ * \subsection internal  Using the internal profiler variable.
+ * Below is a code snippet of how to make use of the library using the internal defined profiler variable.
+ * Be aware this internal defined variable is a save variable. The main usage of this version is the
+ * easily profile an existing application with minimum impact. Initializing the profiler should be
+ * done in the main program while the individual prof_tic and prof_toc calls can be implemented in the
+ * deeper functions and/or subroutines. In those functions and/or subroutines one only needs to add the
+ * line <tt>use :: profiler</tt> at the top.
+ * \code{.f90}
+ * program app
+ *   ...
+ *   use :: profiler
+ *   implicit none
+ *
+ *   integer            :: iloop, nloops
+ *   character(len=255) :: name
+ *   ...
+ *   call get_command_argument(0, name)
+ *   prof_init(trim(name))
+ *   ...
+ *   prof_tic("level 1")
+ *   ...
+ *   prof_tic("level 1.1")
+ *   ...
+ *   do iloop = 1, nloops
+ *     prof_tic("level 1.1.1")
+ *     ...
+ *     prof_toc()
+ *   end do
+ *   ...
+ *   prof_toc()
+ *   ...
+ *   prof_toc()
+ *   ...
+ *   call prof_report()
+ *   ...
+ * end program app
+ * \endcode
+ *
+ * \subsection external  Using an external or user defined profiler variable.
+ * The code snippet below looks similar as the previous one, but now it makes use of an user defined
+ * profiler variable. It allows to define multiple profilers within in applications without interfering
+ * each other. In contrast to the previous snippet, if one to make use of the user defined variable
+ * in the deeper functions and/or subroutines one also needs to make sure that the variable is passed
+ * on to those functions/subroutines.
+ *
+ * \code{.f90}
+ * program app
+ *   ...
+ *   use :: profiler
+ *   implicit none
+ *
+ *   integer            :: iloop, nloops
+ *   character(len=255) :: name
+ *   type(prof_t)       :: prof
+ *   ...
+ *   call get_command_argument(0, name)
+ *   prof_init(prof, trim(name))
+ *   ...
+ *   prof_tic(prof, "level 1")
+ *   ...
+ *   prof_tic(prof, "level 1.1")
+ *   ...
+ *   do iloop = 1, nloops
+ *     prof_tic(prof, "level 1.1.1")
+ *     ...
+ *     prof_toc(prof)
+ *   end do
+ *   ...
+ *   prof_toc(prof)
+ *   ...
+ *   prof_toc(prof)
+ *   ...
+ *   call prof_report(prof)
+ *   ...
+ * end program app
+ * \endcode
+ *
+ */
