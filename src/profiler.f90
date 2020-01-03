@@ -54,7 +54,7 @@ module profiler_module
      module procedure prof_toc_save
   end interface prof_toc
 
-  !> \brief ?
+  !> \brief Prints a report of the profiling results.
   interface prof_report
      module procedure prof_report_own
      module procedure prof_report_save
@@ -86,11 +86,13 @@ contains
   end subroutine prof_init_own
 
   !> \brief Profiler tic subroutine.
+  !!
+  !> \warning No check on base name of the unit will be performed for an existing name.
   subroutine prof_tic_own(profiler, name, nunits, unit)
     type(profiler_t), target,   intent(inout) :: profiler  !< Profiler.
     character(len=*),           intent(in)    :: name      !< Name of the child watch.
     integer(int64),   optional, intent(in)    :: nunits    !< Number of units that will be used.
-    character(len=*), optional, intent(in)    :: unit      !< Name of the unit.
+    character(len=*), optional, intent(in)    :: unit      !< Base name of the unit.
     
     ! Locals
     integer(int32)                       :: ichild, nchildren
@@ -311,13 +313,13 @@ contains
     write(error_unit, fmt) lwatch%name, etime_str(lwatch)
   end subroutine prof_summary_family
 
-  !> \brief Computes the statistics of the watch, like elapsed time and data rate.
+  !> \brief Computes the statistics of a watch, like elapsed time and data rate.
   subroutine prof_stats(elapsed, data_rate, watch)
     use, intrinsic :: iso_fortran_env,  only: int64, real64
     
-    real(kind=real64),   intent(out) :: elapsed     !< Elapsed time in secondes.
-    real(kind=real64),   intent(out) :: data_rate   !< Data rate in \em unit per seconde.
-    type(watch_t),       intent(in)  :: watch       !< Watch.
+    real(kind=real64),   intent(out) :: elapsed    !< Elapsed time in secondes.
+    real(kind=real64),   intent(out) :: data_rate  !< Data rate in \em unit per seconde.
+    type(watch_t),       intent(in)  :: watch      !< Watch.
 
     ! Locals
     integer(int64) :: count_rate
@@ -331,8 +333,8 @@ contains
   function etime_str(watch)
     use, intrinsic :: iso_fortran_env
     
-    type(watch_t),           intent(in) :: watch       !< Watch.
-    character(len=2*STR_LEN)            :: etime_str   !< Elapsed time and possibly data rate as a string.
+    type(watch_t),           intent(in) :: watch      !< Watch.
+    character(len=2*STR_LEN)            :: etime_str  !< Elapsed time and possibly data rate as a string.
 
     ! Parameters
     real(real64),                   parameter :: THRESHOLD = 1000._real64
@@ -370,4 +372,3 @@ contains
     name = names(month_number)
   end function month_name
 end module profiler_module
-
