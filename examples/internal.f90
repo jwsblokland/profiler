@@ -13,7 +13,7 @@ program internal
      call execute_command_line("sleep 0.1", wait=.true.)
 
      do i=1,2
-        call prof_tic("level 1.1", 1000_int64 * kind(i), 'B')
+        call prof_tic_rate("level 1.1", 1000_int64 * kind(i), 'B')
           call execute_command_line("sleep 0.11", wait=.true.)
           call prof_tic("level 1.1.1")
             call execute_command_line("sleep 0.111", wait=.true.)

@@ -1,12 +1,15 @@
 # Profiler library
 set(PROF_SRCDIR ${CMAKE_CURRENT_SOURCE_DIR})
-set(PROF_SRC profiler.f90)
+set(PROF_SRC profiler.f90
+             profiler_layout.f90
+             profiler_types.f90)
 
 add_library(profiler STATIC ${PROF_SRC})
 install(TARGETS profiler
         ARCHIVE DESTINATION lib)
 install(FILES ${CMAKE_Fortran_MODULE_DIRECTORY}/profiler.mod
-        DESTINATION include)
+              ${CMAKE_Fortran_MODULE_DIRECTORY}/profiler_types.mod
+	DESTINATION include)
 
 if (BUILD_DOC)
   # Set input and output file.

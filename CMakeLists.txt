@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0)
 
 # Project settings
 project(profiler VERSION 0.1.0 LANGUAGES Fortran)
-set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/profiles-${PROJECT_VERSION})
+set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/profiler-${PROJECT_VERSION})
 
 # Options
 option(BUILD_DOC          "Building developer documentation."         ON)

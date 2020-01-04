@@ -1,0 +1,25 @@
+/**
+ * \defgroup profiler Profiler
+ * \brief Profiler routines
+ *
+ * \defgroup eprofiler  External profiler
+ * \ingroup profiler
+ * \brief Profiler routines which makes use of user-defined profiler variable
+ *
+ * \defgroup iprofiler  Internal profiler
+ * \ingroup profiler
+ * \brief Profiler routines which makes use of internally defined profiler variable
+ *
+ * \cond _INTERNAL_
+ *   \defgroup internal Internal
+ *   \brief Internal routines.
+ *
+ *   \defgroup profileri Profiler
+ *   \ingroup internal
+ *   \brief Internal profiler routines
+ *
+ *   \defgroup layouti  Layout routines.
+ *   \ingroup internal
+ *   \brief Internal report layout routines.
+ * \endcond
+ */

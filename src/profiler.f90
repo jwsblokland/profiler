@@ -1,76 +1,72 @@
 !> \brief Profiler module
 module profiler
-  use, intrinsic :: iso_fortran_env,  only: int32, int64
+  use :: profiler_types,  only: STR_LEN, prof_t
   implicit none
 
   private
-  public  :: prof_init, prof_tic, prof_toc, prof_report
-
-  integer(int32), parameter :: STR_LEN = 40  !< Length of a string.
-
-  !> \cond _INTERNAL_
-  !> \brief Derived type representing a watch.
-  type :: watch_t
-     type(watch_t),          pointer               :: parent     => null()  !< Parent watch.
-     type(watch_t),          dimension(:), pointer :: children   => null()  !< Child watches.
-     character(len=STR_LEN)                        :: name                  !< Name of the watch.
-     integer(int32)                                :: generation =  0       !< Family generation.
-     integer(int64)                                :: nused      =  0       !< Number of times this watch has been used.
-     integer(int64)                                :: etime      =  0       !< Sum of the elasped counting time.
-     integer(int64)                                :: start      =  0       !< Starting counting time.
-     character(len=STR_LEN)                        :: unit       = ''       !< Base name of the unit.
-     integer(int64)                                :: nunits     =  0       !< Sum of the number of units that have been used.
-  end type watch_t
-  !> \endcond
-
-  !> \cond _INTERNAL_
-  !> \brief Layout properties of the report.
-  type :: props_t
-     integer(int32) :: count_maxlen  !< Maximum string length needed to represent the maximum number how many time a watch has been used.
-     integer(int32) :: name_maxlen   !< Maximum string length needed to represent the name of the watch (including the generation offset).
-     integer(int32) :: etime_maxlen  !< Maximum string length needed to represent the elapsed time (including the data rate).
-  end type props_t
-  !> \endcond
+  public  :: STR_LEN, prof_t, prof_init, prof_tic, prof_tic_rate, prof_toc, prof_report
   
-  !> \brief Derived type representing the profiler.
-  type, public :: prof_t
-     type(watch_t)          :: mwatch            !< Master watch.
-     type(watch_t), pointer :: cwatch => null()  !< Current watch.
-  end type prof_t
-
   !> \cond _INTERNAL_
+  !> \ingroup profileri
+  !> \{
   type(prof_t), save :: prof_profiler  !< Internal profiler object.
+  !> \}
   !> \endcond
-  
+
+  !> \ingroup profiler
+  !> \{
   !> \brief Initializes the profiler.
   interface prof_init
      module procedure prof_init_external
      module procedure prof_init_internal
   end interface prof_init
+  !> \}
   
+  !> \ingroup profiler
+  !> \{
   !> \brief Profiler tic subroutine.
   interface prof_tic
      module procedure prof_tic_external
      module procedure prof_tic_internal
   end interface prof_tic
 
+  !> \ingroup profiler
+  !> \{
+  !> \brief Profiler tic_rate subroutine.
+  interface prof_tic_rate
+     module procedure prof_tic_rate_external
+     module procedure prof_tic_rate_internal
+  end interface prof_tic_rate
+  !> \}
+
+  !> \ingroup profiler
+  !> \{
   !> \brief Profiler toc subroutine.
   interface prof_toc
      module procedure prof_toc_external
      module procedure prof_toc_internal
   end interface prof_toc
+  !> \}
 
+  !> \ingroup profiler
+  !> \{
   !> \brief Prints a report of the profiling results.
   interface prof_report
      module procedure prof_report_external
      module procedure prof_report_internal
   end interface prof_report
-     
+  !> \}
+
 contains
+  !> \ingroup eprofiler
+  !> \{
   !> \brief Initializes the profiler.
   !!
   !> \warning The variable \em name should not exceed 40 characters otherwise it will be truncated.
   subroutine prof_init_external(profiler, name)
+    use, intrinsic :: iso_fortran_env,  only: int32
+    use            :: profiler_types,   only: prof_t
+
     type(prof_t),     target, intent(inout) :: profiler  !< Profiler.
     character(len=*),         intent(in)    :: name      !< Name of the master watch.
 
@@ -92,12 +88,18 @@ contains
     profiler%cwatch%nused      =  profiler%cwatch%nused      + 1
     call system_clock(count=profiler%cwatch%start)
   end subroutine prof_init_external
+  !> \}
 
+  !> \ingroup eprofiler
+  !> \{
   !> \brief Profiler tic subroutine.
   !!
   !> \warning The variable \em name should not exceed 40 characters otherwise it will be truncated.
   !> \warning No check on base name of the unit will be performed for an existing name.
   subroutine prof_tic_external(profiler, name, nunits, unit)
+    use, intrinsic :: iso_fortran_env,  only: int32, int64
+    use            :: profiler_types,   only: prof_t, watch_t
+
     type(prof_t),     target,   intent(inout) :: profiler  !< Profiler.
     character(len=*),           intent(in)    :: name      !< Name of the child watch.
     integer(int64),   optional, intent(in)    :: nunits    !< Number of units that will be used.
@@ -148,9 +150,34 @@ contains
     call system_clock(count=profiler%cwatch%start)
     if (present(nunits))  profiler%cwatch%nunits = profiler%cwatch%nunits + nunits
   end subroutine prof_tic_external
+  !> \}
 
+  !> \ingroup eprofiler
+  !> \{
+  !> \brief Profiler tic_rate subroutine.
+  !!
+  !> \warning The variable \em name should not exceed 40 characters otherwise it will be truncated.
+  !> \warning No check on base name of the unit will be performed for an existing name.
+  subroutine prof_tic_rate_external(profiler, name, nunits, unit)
+    use, intrinsic :: iso_fortran_env,  only: int32, int64
+    use            :: profiler_types,   only: prof_t, watch_t
+
+    type(prof_t),     target,   intent(inout) :: profiler  !< Profiler.
+    character(len=*),           intent(in)    :: name      !< Name of the child watch.
+    integer(int64),             intent(in)    :: nunits    !< Number of units that will be used.
+    character(len=*),           intent(in)    :: unit      !< Base name of the unit.
+
+    call prof_tic_external(profiler, name, nunits, unit)
+  end subroutine prof_tic_rate_external
+  !> \}
+  
+  !> \ingroup eprofiler
+  !> \{
   !> \brief Profiler toc subroutine
   subroutine prof_toc_external(profiler)
+    use, intrinsic :: iso_fortran_env,  only: int64
+    use            :: profiler_types,   only: prof_t
+
     type(prof_t), target, intent(inout) :: profiler  !< Profiler.
 
     ! Locals
@@ -160,19 +187,24 @@ contains
     profiler%cwatch%etime =  profiler%cwatch%etime + (end - profiler%cwatch%start)
     profiler%cwatch       => profiler%cwatch%parent
   end subroutine prof_toc_external
+  !> \}
 
+  !> \ingroup eprofiler
+  !> \{
   !> \brief Prints a report of the profiling results.
   subroutine prof_report_external(profiler)
-    use, intrinsic :: iso_fortran_env,  only: int64, real64, error_unit
+    use, intrinsic :: iso_fortran_env,  only: int32, int64, error_unit
+    use            :: profiler_layout,  only: month_name, prof_layout_props
+    use            :: profiler_types,   only: prof_t, props_t
 
     type(prof_t), target, intent(inout) :: profiler  !< Profiler.
    
     ! Locals
-    integer(int64)               :: end, count_rate, i
-    character(len=60)            :: fmt, time_str, date_str
-    character(len=255)           :: line
-    integer(int32), dimension(8) :: values
-    type(props_t)                :: props
+    integer(int64)                   :: end, count_rate, i
+    character(len=60)                :: fmt, time_str, date_str
+    character(len=255)               :: line
+    integer(int32),     dimension(8) :: values
+    type(props_t)                    :: props
 
     if (associated(profiler%cwatch%parent)) then
        write(error_unit, '(A)') "ERROR: Unbalanced prof_tic and prof_toc combinations."
@@ -209,7 +241,10 @@ contains
        call prof_summary_family(profiler%mwatch, props)
     end if
   end subroutine prof_report_external
-
+  !> \}
+  
+  !> \ingroup iprofiler
+  !> \{
   !> \brief Initializes the profiler.
   !!
   !> \warning The variable \em name should not exceed 40 characters otherwise it will be truncated.
@@ -219,84 +254,74 @@ contains
 
     call prof_init_external(prof_profiler, name)
   end subroutine prof_init_internal
+  !> \}
   
+  !> \ingroup iprofiler
+  !> \{
   !> \brief Profiler tic subroutine.
   !!
   !> \warning The variable \em name should not exceed 40 characters otherwise it will be truncated.
+  !> \warning No check on base name of the unit will be performed for an existing name.
   !> \note    It makes use of the internally defined profiler variable.
   subroutine prof_tic_internal(name, nunits, unit)
+    use, intrinsic :: iso_fortran_env,  only: int64
+    
     character(len=*),           intent(in) :: name    !< Name of the child watch.
     integer(int64),   optional, intent(in) :: nunits  !< Number of units that will be used.
     character(len=*), optional, intent(in) :: unit    !< Name of the unit.
     
     call prof_tic_external(prof_profiler, name, nunits, unit)
   end subroutine prof_tic_internal
+  !> \}
 
+  !> \ingroup iprofiler
+  !> \{
+  !> \brief Profiler tic_rate subroutine.
+  !!
+  !> \warning The variable \em name should not exceed 40 characters otherwise it will be truncated.
+  !> \warning No check on base name of the unit will be performed for an existing name.
+  !> \note    It makes use of the internally defined profiler variable.
+  subroutine prof_tic_rate_internal(name, nunits, unit)
+    use, intrinsic :: iso_fortran_env,  only: int32, int64
+    use            :: profiler_types,   only: prof_t, watch_t
+
+    character(len=*), intent(in) :: name    !< Name of the child watch.
+    integer(int64),   intent(in) :: nunits  !< Number of units that will be used.
+    character(len=*), intent(in) :: unit    !< Base name of the unit.
+
+    call prof_tic_rate_external(prof_profiler, name, nunits, unit)
+  end subroutine prof_tic_rate_internal
+  !> \}
+
+  !> \ingroup iprofiler
+  !> \{
   !> \brief Profiler toc subroutine
   !!
   !> \note It makes use of the internally defined profiler variable.
   subroutine prof_toc_internal()
     call prof_toc_external(prof_profiler)
   end subroutine prof_toc_internal
+  !> \}
   
+  !> \ingroup iprofiler
+  !> \{
   !> \brief Prints a report of the profiling results.
   !!
   !> \note It makes use of the internally defined profiler variable.
   subroutine prof_report_internal()
     call prof_report_external(prof_profiler)
   end subroutine prof_report_internal
-
+  !> \}
+  
   !> \cond _INTERNAL_
-  !> \brief Determines the layout properties of the report.
-  subroutine prof_layout_props(mwatch, props)
-    use, intrinsic :: iso_fortran_env,  only: int64
-    
-    type(watch_t), intent(in)  :: mwatch  !< Master watch.
-    type(props_t), intent(out) :: props   !< Layout properties of the reports
-
-    ! Locals
-    integer(int64)         :: nused_max
-    character(len=STR_LEN) :: count_str
-
-    nused_max         = mwatch%nused
-    props%name_maxlen = len_trim(mwatch%name)
-    if (associated(mwatch%children)) then
-       call prof_layout_props_update(props%name_maxlen, nused_max, mwatch)
-    end if
-    write(count_str, '(i0)') nused_max
-
-    props%name_maxlen  = max(props%name_maxlen,   40)
-    props%count_maxlen = max(len_trim(count_str), 3)
-  end subroutine prof_layout_props
-
-  !> \brief Updates the layout properties based on the information of the child watches.
-  recursive subroutine prof_layout_props_update(name_maxlen, nused_max, watch)
-    integer(int32), intent(inout) :: name_maxlen  !< Maximum string length to represent the name of the watch (including generation offset).
-    integer(int64), intent(inout) :: nused_max    !< Maximum number of an watch has been used.
-    type(watch_t),  intent(in)    :: watch        !< Watch.
-
-    ! Locals
-    integer(int32)          :: ichild
-    type(watch_t),  pointer :: cwatch
-
-    do ichild = 1, size(watch%children)
-       cwatch => watch%children(ichild)
-
-       nused_max   = max(nused_max,   cwatch%nused)
-       name_maxlen = max(name_maxlen, len_trim(cwatch%name) + 2 * cwatch%generation)
-       
-       if (associated(cwatch%children)) then
-          call prof_layout_props_update(name_maxlen, nused_max, cwatch)
-       end if
-    end do
-    nullify(cwatch)
-  end subroutine prof_layout_props_update
-       
+  !> \ingroup profileri
+  !> \{
   !> \brief Prints the summary report of all the child watches.
   !!
   !! \warning At the end the pointer to the child watches is nullified.
   recursive subroutine prof_summary_family(watch, props)
-    use, intrinsic :: iso_fortran_env,  only: int32, int64, real64, error_unit
+    use, intrinsic :: iso_fortran_env,  only: int32, int64, error_unit
+    use            :: profiler_types,   only: props_t, watch_t
     
     type(watch_t), target, intent(inout) :: watch  !< Watch.
     type(props_t),         intent(in)    :: props  !< Layout properties of the report.
@@ -332,10 +357,16 @@ contains
          props%name_maxlen - len_trim(lwatch%name) - 2 * watch%generation + 2
     write(error_unit, fmt) lwatch%name, etime_str(lwatch)
   end subroutine prof_summary_family
+  !> \}
+  !> \endcond
 
+  !> \cond _INTERNAL_
+  !> \ingroup profileri
+  !> \{
   !> \brief Computes the statistics of a watch, like elapsed time and data rate.
   subroutine prof_stats(elapsed, data_rate, watch)
-    use, intrinsic :: iso_fortran_env,  only: int64, real64
+    use, intrinsic :: iso_fortran_env,  only: int64,real64
+    use            :: profiler_types,   only: watch_t
     
     real(kind=real64),   intent(out) :: elapsed    !< Elapsed time in secondes.
     real(kind=real64),   intent(out) :: data_rate  !< Data rate in \em unit per seconde.
@@ -348,10 +379,16 @@ contains
     elapsed   = real(a=watch%etime,  kind=real64) / real(a=count_rate, kind=real64)
     data_rate = real(a=watch%nunits, kind=real64) / elapsed
   end subroutine prof_stats
+  !> \}
+  !> \endcond
 
+  !> \cond _INTERNAL_
+  !> \ingroup profileri
+  !> \{
   !> \brief Constructs a string from the determined elapsed time and number of units.
   function etime_str(watch)
-    use, intrinsic :: iso_fortran_env
+    use, intrinsic :: iso_fortran_env,  only: int32, real64
+    use            :: profiler_types,   only: STR_LEN, watch_t
     
     type(watch_t),           intent(in) :: watch      !< Watch.
     character(len=2*STR_LEN)            :: etime_str  !< Elapsed time and possibly data rate as a string.
@@ -379,17 +416,6 @@ contains
 
     write(etime_str, '(f12.3, 1x, a3, 2x, a)') etime, 'sec', data_rate_str
   end function etime_str
-
-  !> \brief Returns the name of the month for a given month number.
-  function month_name(month_number) result(name)
-    integer(int32),   intent(in) :: month_number  !< Month number.
-    character(len=9)             :: name          !< Name of the month.
-
-    ! Parameters
-    character(len=9), dimension(12) :: names = [ 'January  ', 'February ', 'March    ', 'April    ', 'May      ', 'June     ',   &
-                                                 'July     ', 'Augustus ', 'September', 'October  ', 'November ', 'December ' ]
-
-    name = names(month_number)
-  end function month_name
+  !> \}
   !> \endcond
 end module profiler

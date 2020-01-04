@@ -1,0 +1,7 @@
+/**
+ * \example external.f90
+ * This example shows how to make use the profiler library using your own profiler object.
+ *
+ * \example internal.f90
+ * This example shows how to make use the profiler library using the library its own profiler object.
+ */
