@@ -193,22 +193,29 @@ contains
   !> \{
   !> \brief Prints a report of the profiling results.
   subroutine prof_report_external(profiler)
-    use, intrinsic :: iso_fortran_env,  only: int32, int64, error_unit
-    use            :: profiler_layout,  only: month_name, prof_layout_props
-    use            :: profiler_types,   only: prof_t, props_t
+    use, intrinsic :: iso_fortran_env,    only: int32, int64, error_unit
+    use            :: profiler_datetime,  only: prof_datetime
+    use            :: profiler_layout,    only: prof_layout_props
+    use            :: profiler_types,     only: prof_t, props_t
+    use            :: profiler_version,   only: prof_version
 
     type(prof_t), target, intent(inout) :: profiler  !< Profiler.
    
+    ! Intrinsics
+    intrinsic :: exit
+
     ! Locals
     integer(int64)                   :: end, count_rate, i
-    character(len=60)                :: fmt, time_str, date_str
-    character(len=255)               :: line
-    integer(int32),     dimension(8) :: values
+    character(len=8)                 :: time_str
+    character(len=17)                :: date_str
+    character(len=12)                :: zone_str
+    character(len=60)                :: fmt
+    character(len=511)               :: line
     type(props_t)                    :: props
 
     if (associated(profiler%cwatch%parent)) then
        write(error_unit, '(A)') "ERROR: Unbalanced prof_tic and prof_toc combinations."
-       return
+       call exit(1)
     end if
     nullify(profiler%cwatch)
     
@@ -218,27 +225,26 @@ contains
 
     ! Layout properties.
     call prof_layout_props(profiler%mwatch, props)
-    call date_and_time(values=values)
-    write(time_str, '(i0.2, ":", i0.2, ":", i0.2)') values(5), values(6), values(7)
-    write(date_str ,'(i0,   " ", a,    " ", i0.2)') values(3), trim(month_name(values(2))), values(1)
+    call prof_datetime(time_str, date_str, zone_str)
     do i=1,len(line)
        line(i:i) = '-'
     end do
 
     ! Write report header.
-    write(error_unit, '(a)') "Profiler information of the program " // trim(profiler%mwatch%name)
-    write(error_unit, '(a)') "Created on " // trim(date_str) // " at " // trim(time_str) 
+    write(error_unit, '(a)') "Profiler " // trim(prof_version())
+    write(error_unit, '(a)') "Timing information of the master watch """ // trim(profiler%mwatch%name) // """"
+    write(error_unit, '(a)') "Report created at " // trim(time_str) // " on " // trim(date_str) // " "  // trim(zone_str)
     write(error_unit, '(a)')   ""
-    write(fmt, '("(a5, ", i0, "x, a4, ", i0, "x, 2x, a)")') props%count_maxlen - 5 + 4, props%name_maxlen - 4
-    write(error_unit, fmt)     "Count", "Name", "Elapsed time"
-    write(fmt, '("(a", i0, ")")') props%count_maxlen + 4 + props%name_maxlen + 2 + 16
+    write(fmt, '("(a5, ", i0, "x, a4, ", i0, "x, 2x, a10, 2x, a)")') props%count_maxlen - 5 + 4, props%name_maxlen - 4
+    write(error_unit, fmt)     "Count", "Name", "Percentage", "Elapsed time"
+    write(fmt, '("(a", i0, ")")') props%count_maxlen + 4 + props%name_maxlen + 2 + props%perc_maxlen + 2 + 16
     write(error_unit, fmt)     line
     
     write(fmt, '("(", i0, "x, a", i0, ", ", i0, "x, a)")')  &
          props%count_maxlen + 4, len_trim(profiler%mwatch%name), props%name_maxlen - len_trim(profiler%mwatch%name)+ 2
-    write(error_unit, fmt) profiler%mwatch%name, etime_str(profiler%mwatch)
+    write(error_unit, fmt) profiler%mwatch%name, etime_str(profiler%mwatch, profiler%mwatch%etime)
     if (associated(profiler%mwatch%children)) then
-       call prof_summary_family(profiler%mwatch, props)
+       call prof_summary_family(profiler%mwatch, profiler%mwatch%etime, props)
     end if
   end subroutine prof_report_external
   !> \}
@@ -319,12 +325,13 @@ contains
   !> \brief Prints the summary report of all the child watches.
   !!
   !! \warning At the end the pointer to the child watches is nullified.
-  recursive subroutine prof_summary_family(watch, props)
+  recursive subroutine prof_summary_family(watch, etime_total, props)
     use, intrinsic :: iso_fortran_env,  only: int32, int64, error_unit
     use            :: profiler_types,   only: props_t, watch_t
     
-    type(watch_t), target, intent(inout) :: watch  !< Watch.
-    type(props_t),         intent(in)    :: props  !< Layout properties of the report.
+    type(watch_t),  target, intent(inout) :: watch        !< Watch.
+    integer(int64),         intent(in)    :: etime_total  !< The total elapsed time of the master watch.
+    type(props_t),          intent(in)    :: props        !< Layout properties of the report.
 
     ! Locals
     integer(int32)         :: ichild
@@ -341,10 +348,10 @@ contains
        write(fmt, '("(""["", i", i0, ", ""]"", ", i0, "x, a", i0, ", ", i0, "x, a)")')  &
             props%count_maxlen, 2 * cwatch%generation, len_trim(cwatch%name),           &
             props%name_maxlen - len_trim(cwatch%name) - 2 * watch%generation + 2
-       write(error_unit, fmt) cwatch%nused, cwatch%name, etime_str(cwatch)
+       write(error_unit, fmt) cwatch%nused, cwatch%name, etime_str(cwatch, etime_total)
           
        if (associated(cwatch%children)) then
-          call prof_summary_family(cwatch, props)
+          call prof_summary_family(cwatch, etime_total, props)
        end if
     end do
     nullify(cwatch, watch%children)
@@ -355,7 +362,7 @@ contains
     write(fmt, '("(", i0, "x, a", i0, ", ", i0, "x, a)")')                        &
          props%count_maxlen + 2 * (watch%generation + 2), len_trim(lwatch%name),  &
          props%name_maxlen - len_trim(lwatch%name) - 2 * watch%generation + 2
-    write(error_unit, fmt) lwatch%name, etime_str(lwatch)
+    write(error_unit, fmt) lwatch%name, etime_str(lwatch, etime_total)
   end subroutine prof_summary_family
   !> \}
   !> \endcond
@@ -386,12 +393,13 @@ contains
   !> \ingroup profileri
   !> \{
   !> \brief Constructs a string from the determined elapsed time and number of units.
-  function etime_str(watch)
-    use, intrinsic :: iso_fortran_env,  only: int32, real64
+  function etime_str(watch, etime_total)
+    use, intrinsic :: iso_fortran_env,  only: int32, int64, real64
     use            :: profiler_types,   only: STR_LEN, watch_t
     
-    type(watch_t),           intent(in) :: watch      !< Watch.
-    character(len=2*STR_LEN)            :: etime_str  !< Elapsed time and possibly data rate as a string.
+    type(watch_t),           intent(in) :: watch        !< Watch.
+    integer(int64),          intent(in) :: etime_total  !< The total elapsed time of the master watch.
+    character(len=2*STR_LEN)            :: etime_str    !< Elapsed time and possibly data rate as a string.
 
     ! Parameters
     real(real64),                   parameter :: THRESHOLD = 1000._real64
@@ -399,9 +407,10 @@ contains
 
     ! Locals
     integer(int32)         :: iunit
-    real(real64)           :: etime, data_rate
-    character(len=STR_LEN) :: data_rate_str
+    real(real64)           :: percentage, etime, data_rate
+    character(len=STR_LEN) ::  data_rate_str
 
+    percentage = 100._real64 * real(watch%etime, real64) / real(etime_total, real64)
     call prof_stats(etime, data_rate, watch)
     
     data_rate_str = ''
@@ -414,7 +423,7 @@ contains
        write(data_rate_str, '("[", f6.2, 1x, a, "]")') data_rate, trim(PREFIX(iunit)) // trim(watch%unit) // '/sec'
     end if
 
-    write(etime_str, '(f12.3, 1x, a3, 2x, a)') etime, 'sec', data_rate_str
+    write(etime_str, '(3x, f6.2, a1, 2x,f12.3, 1x, a3, 2x, a)') percentage, '%', etime, 'sec', data_rate_str
   end function etime_str
   !> \}
   !> \endcond

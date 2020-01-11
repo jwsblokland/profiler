@@ -1,8 +1,10 @@
 # Profiler library
 set(PROF_SRCDIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(PROF_SRC profiler.f90
+             profiler_datetime.f90
              profiler_layout.f90
-             profiler_types.f90)
+             profiler_types.f90
+	     profiler_version.f90)
 
 add_library(profiler STATIC ${PROF_SRC})
 install(TARGETS profiler

@@ -33,6 +33,7 @@ module profiler_types
   type, public :: props_t
      integer(int32) :: count_maxlen  !< Maximum string length needed to represent the maximum number how many time a watch has been used.
      integer(int32) :: name_maxlen   !< Maximum string length needed to represent the name of the watch (including the generation offset).
+     integer(int32) :: perc_maxlen   !< Maximum string length needes to represent the percentage.
      integer(int32) :: etime_maxlen  !< Maximum string length needed to represent the elapsed time (including the data rate).
   end type props_t
   !> \}

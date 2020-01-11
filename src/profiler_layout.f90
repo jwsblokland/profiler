@@ -4,7 +4,7 @@ module profiler_layout
   implicit none
 
   private
-  public  :: prof_layout_props, month_name
+  public  :: prof_layout_props
   
 contains
   !> \ingroup layouti
@@ -28,8 +28,9 @@ contains
     end if
     write(count_str, '(i0)') nused_max
 
-    props%name_maxlen  = max(props%name_maxlen,   40)
     props%count_maxlen = max(len_trim(count_str), 3)
+    props%name_maxlen  = max(props%name_maxlen,   40)
+    props%perc_maxlen  = 10
   end subroutine prof_layout_props
   !> \}
 
@@ -60,23 +61,6 @@ contains
     end do
     nullify(cwatch)
   end subroutine prof_layout_props_update
-  !> \}
-
-  !> \ingroup layouti
-  !> \{
-  !> \brief Returns the name of the month for a given month number.
-  function month_name(month_number) result(name)
-    use, intrinsic :: iso_fortran_env,  only: int32
-
-    integer(int32),   intent(in) :: month_number  !< Month number.
-    character(len=9)             :: name          !< Name of the month.
-
-    ! Parameters
-    character(len=9), dimension(12) :: names = [ 'January  ', 'February ', 'March    ', 'April    ', 'May      ', 'June     ',   &
-                                                 'July     ', 'Augustus ', 'September', 'October  ', 'November ', 'December ' ]
-
-    name = names(month_number)
-  end function month_name
   !> \}
 end module profiler_layout
 !> \endcond
