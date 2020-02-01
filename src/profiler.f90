@@ -235,16 +235,16 @@ contains
     write(error_unit, '(a)') "Timing information of the master watch """ // trim(profiler%mwatch%name) // """"
     write(error_unit, '(a)') "Report created at " // trim(time_str) // " on " // trim(date_str) // " "  // trim(zone_str)
     write(error_unit, '(a)')   ""
-    write(fmt, '("(a5, ", i0, "x, a4, ", i0, "x, 2x, a10, 2x, a)")') props%count_maxlen - 5 + 4, props%name_maxlen - 4
-    write(error_unit, fmt)     "Count", "Name", "Percentage", "Elapsed time"
-    write(fmt, '("(a", i0, ")")') props%count_maxlen + 4 + props%name_maxlen + 2 + props%perc_maxlen + 2 + 16
+    write(fmt, '("(a5, ", i0, "x, a4, ", i0, "x, 2x, a12, 6x, a)")') props%count_maxlen - 5 + 4, props%name_maxlen - 4
+    write(error_unit, fmt)     "Count", "Name", "Elapsed time", "Fraction"
+    write(fmt, '("(a", i0, ")")') props%count_maxlen + 4 + props%name_maxlen + 2 + props%frac_maxlen + 2 + 16
     write(error_unit, fmt)     line
     
     write(fmt, '("(", i0, "x, a", i0, ", ", i0, "x, a)")')  &
          props%count_maxlen + 4, len_trim(profiler%mwatch%name), props%name_maxlen - len_trim(profiler%mwatch%name)+ 2
-    write(error_unit, fmt) profiler%mwatch%name, etime_str(profiler%mwatch, profiler%mwatch%etime)
+    write(error_unit, fmt) profiler%mwatch%name, etime_str(profiler%mwatch, profiler%mwatch%etime, props%frac_maxlen)
     if (associated(profiler%mwatch%children)) then
-       call prof_summary_family(profiler%mwatch, profiler%mwatch%etime, props)
+       call prof_summary_family(profiler%mwatch, props)
     end if
   end subroutine prof_report_external
   !> \}
@@ -325,13 +325,12 @@ contains
   !> \brief Prints the summary report of all the child watches.
   !!
   !! \warning At the end the pointer to the child watches is nullified.
-  recursive subroutine prof_summary_family(watch, etime_total, props)
+  recursive subroutine prof_summary_family(watch, props)
     use, intrinsic :: iso_fortran_env,  only: int32, int64, error_unit
     use            :: profiler_types,   only: props_t, watch_t
     
-    type(watch_t),  target, intent(inout) :: watch        !< Watch.
-    integer(int64),         intent(in)    :: etime_total  !< The total elapsed time of the master watch.
-    type(props_t),          intent(in)    :: props        !< Layout properties of the report.
+    type(watch_t),  target, intent(inout) :: watch  !< Watch.
+    type(props_t),          intent(in)    :: props  !< Layout properties of the report.
 
     ! Locals
     integer(int32)         :: ichild
@@ -348,21 +347,22 @@ contains
        write(fmt, '("(""["", i", i0, ", ""]"", ", i0, "x, a", i0, ", ", i0, "x, a)")')  &
             props%count_maxlen, 2 * cwatch%generation, len_trim(cwatch%name),           &
             props%name_maxlen - len_trim(cwatch%name) - 2 * watch%generation + 2
-       write(error_unit, fmt) cwatch%nused, cwatch%name, etime_str(cwatch, etime_total)
+       write(error_unit, fmt) cwatch%nused, cwatch%name, etime_str(cwatch, watch%etime, props%frac_maxlen)
           
        if (associated(cwatch%children)) then
-          call prof_summary_family(cwatch, etime_total, props)
+          call prof_summary_family(cwatch, props)
        end if
     end do
     nullify(cwatch, watch%children)
     
-    lwatch%name   = "(others)"
-    lwatch%etime  = watch%etime - etime_others
-    lwatch%nunits = 0
+    lwatch%name       = "(others)"
+    lwatch%etime      = watch%etime - etime_others
+    lwatch%generation = watch%generation + 1
+    lwatch%nunits     = 0
     write(fmt, '("(", i0, "x, a", i0, ", ", i0, "x, a)")')                        &
          props%count_maxlen + 2 * (watch%generation + 2), len_trim(lwatch%name),  &
          props%name_maxlen - len_trim(lwatch%name) - 2 * watch%generation + 2
-    write(error_unit, fmt) lwatch%name, etime_str(lwatch, etime_total)
+    write(error_unit, fmt) lwatch%name, etime_str(lwatch, watch%etime, props%frac_maxlen)
   end subroutine prof_summary_family
   !> \}
   !> \endcond
@@ -393,24 +393,26 @@ contains
   !> \ingroup profileri
   !> \{
   !> \brief Constructs a string from the determined elapsed time and number of units.
-  function etime_str(watch, etime_total)
+  function etime_str(watch, etime_parent, frac_maxlen)
     use, intrinsic :: iso_fortran_env,  only: int32, int64, real64
     use            :: profiler_types,   only: STR_LEN, watch_t
     
-    type(watch_t),           intent(in) :: watch        !< Watch.
-    integer(int64),          intent(in) :: etime_total  !< The total elapsed time of the master watch.
-    character(len=2*STR_LEN)            :: etime_str    !< Elapsed time and possibly data rate as a string.
+    type(watch_t),           intent(in) :: watch         !< Watch.
+    integer(int64),          intent(in) :: etime_parent  !< The total elapsed time of the parent watch.
+    integer(int32),          intent(in) :: frac_maxlen   !< Maximum string length to represent the elasped time as a fraction (including generation offset).
+    character(len=2*STR_LEN)            :: etime_str     !< Elapsed time and possibly data rate as a string.
 
     ! Parameters
     real(real64),                   parameter :: THRESHOLD = 1000._real64
     character(len=1), dimension(6), parameter :: PREFIX    = [ ' ', 'k', 'M', 'G', 'T', 'E' ]
 
     ! Locals
-    integer(int32)         :: iunit
-    real(real64)           :: percentage, etime, data_rate
-    character(len=STR_LEN) ::  data_rate_str
+    integer(int32)         :: iunit, offset, frac_size
+    real(real64)           :: etime, fraction, data_rate
+    character(len=255)     :: fmt
+    character(len=STR_LEN) :: data_rate_str
 
-    percentage = 100._real64 * real(watch%etime, real64) / real(etime_total, real64)
+    fraction = 100._real64 * real(watch%etime, real64) / real(etime_parent, real64)
     call prof_stats(etime, data_rate, watch)
     
     data_rate_str = ''
@@ -423,7 +425,12 @@ contains
        write(data_rate_str, '("[", f6.2, 1x, a, "]")') data_rate, trim(PREFIX(iunit)) // trim(watch%unit) // '/sec'
     end if
 
-    write(etime_str, '(3x, f6.2, a1, 2x,f12.3, 1x, a3, 2x, a)') percentage, '%', etime, 'sec', data_rate_str
+    offset    = 1 + 2 * (watch%generation - 1)
+    frac_size = 5
+    if (fraction >= 99.995_real64)  frac_size = frac_size + 1
+    write(fmt, '("(f12.3, 1x, a3, 1x, ", i0, "x, f", i0, ".2, a1, ", i0, "x, a)")')  &
+         offset, frac_size, 2 + frac_maxlen - offset - frac_size
+    write(etime_str, fmt) etime, 'sec', fraction, '%', data_rate_str
   end function etime_str
   !> \}
   !> \endcond
