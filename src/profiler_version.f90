@@ -9,8 +9,8 @@ module profiler_version
 
   !> \ingroup versioni
   !> \{
-  integer(int32), parameter :: PROFILER_MAJOR = 0 !@PROJECT_VERSION_MAJOR@
-  integer(int32), parameter :: PROFILER_MINOR = 1 !@PROJECT_VERSION_MINOR@
+  integer(int32), parameter :: PROFILER_MAJOR = 1 !@PROJECT_VERSION_MAJOR@
+  integer(int32), parameter :: PROFILER_MINOR = 0 !@PROJECT_VERSION_MINOR@
   integer(int32), parameter :: PROFILER_PATCH = 0 !@PROJECT_VERSION_PATCH@
   !> \}
   

@@ -86,6 +86,7 @@ contains
     profiler%cwatch%name       =  name(offset:)
     profiler%cwatch%generation =  profiler%cwatch%generation + 1
     profiler%cwatch%nused      =  profiler%cwatch%nused      + 1
+    nullify(profiler%cwatch%parent)
     call system_clock(count=profiler%cwatch%start)
   end subroutine prof_init_external
   !> \}
@@ -115,7 +116,7 @@ contains
        profiler%cwatch%children(1)%parent => profiler%cwatch
        profiler%cwatch                    => profiler%cwatch%children(1)
        profiler%cwatch%name               =  trim(name)
-       profiler%cwatch%unit               =  trim(unit)
+       if (present(unit))  profiler%cwatch%unit =  trim(unit)
        profiler%cwatch%generation         =  profiler%cwatch%parent%generation + 1
     else
        ! Has children.
@@ -141,7 +142,7 @@ contains
 
           profiler%cwatch            => profiler%cwatch%children(nchildren + 1)
           profiler%cwatch%name       =  trim(name)
-          profiler%cwatch%unit       =  trim(unit)
+          if (present(unit)) profiler%cwatch%unit = trim(unit)
           profiler%cwatch%generation =  profiler%cwatch%parent%generation + 1
        end if
     end if
@@ -276,7 +277,15 @@ contains
     integer(int64),   optional, intent(in) :: nunits  !< Number of units that will be used.
     character(len=*), optional, intent(in) :: unit    !< Name of the unit.
     
-    call prof_tic_external(prof_profiler, name, nunits, unit)
+    if (present(nunits) .and. present(unit)) then
+       call prof_tic_external(prof_profiler, name, nunits, unit)
+    else if (present(nunits)) then
+       call prof_tic_external(prof_profiler, name, nunits=nunits)
+    else if (present(unit)) then
+       call prof_tic_external(prof_profiler, name, unit=unit)
+    else
+       call prof_tic_external(prof_profiler, name)
+    end if
   end subroutine prof_tic_internal
   !> \}
 

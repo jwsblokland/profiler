@@ -6,9 +6,23 @@ set(PROF_SRC profiler.f90
              profiler_types.f90
 	     profiler_version.f90)
 
-add_library(profiler STATIC ${PROF_SRC})
-install(TARGETS profiler
+# Add objects library.
+add_library(objects OBJECT ${PROF_SRC})
+set_property(TARGET objects PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+# Add static library.
+add_library(profiler_static STATIC $<TARGET_OBJECTS:objects>)
+set_target_properties(profiler_static PROPERTIES OUTPUT_NAME "profiler")
+install(TARGETS profiler_static
         ARCHIVE DESTINATION lib)
+
+# Add shared library
+add_library(profiler_shared SHARED  $<TARGET_OBJECTS:objects>)
+set_target_properties(profiler_shared PROPERTIES OUTPUT_NAME "profiler")
+install(TARGETS profiler_shared
+        LIBRARY DESTINATION lib)
+
+# Install Fortran module files
 install(FILES ${CMAKE_Fortran_MODULE_DIRECTORY}/profiler.mod
               ${CMAKE_Fortran_MODULE_DIRECTORY}/profiler_types.mod
 	DESTINATION include)

@@ -7,8 +7,8 @@ cmake_policy(SET CMP0054 NEW)  # Only interpret if() arguments as variables or k
 cmake_policy(SET CMP0074 NEW)  # find_package() uses <PackageName>_ROOT variables
 
 # Project settings
-project(profiler VERSION 0.1.0 LANGUAGES Fortran)
-set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/profiler-${PROJECT_VERSION})
+project(profiler VERSION 1.0.0 LANGUAGES Fortran)
+set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/${PROJECT_NAME}-${PROJECT_VERSION})
 
 # Options
 option(BUILD_DOC          "Building developer documentation."         ON)
@@ -37,3 +37,7 @@ add_subdirectory(src)
 
 # Add examples.
 add_subdirectory(examples)
+
+# Install cmake file.
+install(FILES ${CMAKE_SOURCE_DIR}/cmake/profiler-config.cmake
+        DESTINATION cmake)
