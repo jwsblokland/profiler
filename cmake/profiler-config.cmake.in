@@ -13,12 +13,12 @@
 #
 # This will define the following variables:
 #
-#   profiler_FOUND    - True if the system has the profiler library
-#   profiler_VERSION  - The version of the profiler library which was found
+#   profiler_FOUND     - True if the system has the profiler library
+#   profiler_VERSION   - The version of the profiler library which was found
 #
 # and the following imported targets:
 #
-#   profiler          - The profiler library
+#   profiler::profiler - The profiler library
 
 find_path(profiler_INCLUDE_DIR NAMES profiler.mod DOC "profiler include directory")
 if(profiler_USE_STATIC_LIBS)
@@ -43,11 +43,11 @@ find_package_handle_standard_args(profiler
 
 if(profiler_FOUND)
   if(profiler_USE_STATIC_LIBS)
-    add_library(profiler STATIC IMPORTED)
+    add_library(profiler::profiler STATIC IMPORTED)
   else()
-    add_library(profiler SHARED IMPORTED)
+    add_library(profiler::profiler SHARED IMPORTED)
   endif()
-  set_target_properties(profiler PROPERTIES
+  set_target_properties(profiler::profiler PROPERTIES
     IMPORTED_LOCATION "${profiler_LIBRARY}"
     INTERFACE_INCLUDE_DIRECTORIES "${profiler_INCLUDE_DIR}"
   )
