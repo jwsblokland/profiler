@@ -7,7 +7,7 @@ cmake_policy(SET CMP0054 NEW)  # Only interpret if() arguments as variables or k
 cmake_policy(SET CMP0074 NEW)  # find_package() uses <PackageName>_ROOT variables
 
 # Project settings
-project(profiler VERSION 1.0.0 LANGUAGES Fortran)
+project(profiler VERSION 1.1.0 LANGUAGES Fortran)
 set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/${PROJECT_NAME}-${PROJECT_VERSION})
 
 # Options
@@ -22,7 +22,6 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
   set(CMAKE_Fortran_FLAGS_RELEASE "-O3 -fall-intrinsics -funroll-loops")
   set(CMAKE_Fortran_FLAGS_DEBUG   "-O0 -std=f2008 -fall-intrinsics -funroll-loops -Wall -Wextra -Warray-temporaries -Wpedantic -Wrealloc-lhs-all -fcheck=all -g")
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
-  message("Intel")
   set(CMAKE_Fortran_FLAGS_RELEASE "-O3")
   set(CMAKE_Fortran_FLAGS_DEBUG   "-O0 -warn all -check all")
 endif ()
@@ -48,3 +47,14 @@ set(profiler_CONFIG_VERSION_OUT ${CMAKE_CURRENT_BINARY_DIR}/cmake/profiler-confi
 configure_file(${profiler_CONFIG_VERSION_IN} ${profiler_CONFIG_VERSION_OUT} @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/cmake/profiler-config-version.cmake
         DESTINATION cmake)
+
+message(STATUS "Fortran compiler summary")
+message("   Fortran compiler ID: ${CMAKE_Fortran_COMPILER_ID}")
+message("   Fortran compiler:    ${CMAKE_Fortran_COMPILER}")
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+  message("   Flags (debug):       ${CMAKE_Fortran_FLAGS_DEBUG}")
+elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+  message("   Flags (release):     ${CMAKE_Fortran_FLAGS_RELEASE}")
+else ()
+  message("   Flags:               ${CMAKE_Fortran_FLAGS}")
+endif ()
