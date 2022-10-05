@@ -193,19 +193,21 @@ contains
   !> \ingroup eprofiler
   !> \{
   !> \brief Prints a report of the profiling results.
-  subroutine prof_report_external(profiler)
+  subroutine prof_report_external(profiler, unit)
     use, intrinsic :: iso_fortran_env,    only: int32, int64, error_unit
     use            :: profiler_datetime,  only: prof_datetime
     use            :: profiler_layout,    only: prof_layout_props
     use            :: profiler_types,     only: prof_t, props_t
     use            :: profiler_version,   only: prof_version
 
-    type(prof_t), target, intent(inout) :: profiler  !< Profiler.
+    type(prof_t),   target,   intent(inout) :: profiler  !< Profiler.
+    integer(int32), optional, intent(in)    :: unit      !< File unit.
    
     ! Intrinsics
     intrinsic :: exit
 
     ! Locals
+    integer(int32)                   :: lunit
     integer(int64)                   :: end, count_rate, i
     character(len=8)                 :: time_str
     character(len=17)                :: date_str
@@ -214,8 +216,13 @@ contains
     character(len=511)               :: line
     type(props_t)                    :: props
 
+    lunit = error_unit
+    if (present(unit)) then
+       lunit = unit
+    end if
+
     if (associated(profiler%cwatch%parent)) then
-       write(error_unit, '(A)') "ERROR: Unbalanced prof_tic and prof_toc combinations."
+       write(lunit, '(A)') "ERROR: Unbalanced prof_tic and prof_toc combinations."
        call exit(1)
     end if
     nullify(profiler%cwatch)
@@ -232,20 +239,20 @@ contains
     end do
 
     ! Write report header.
-    write(error_unit, '(a)') "Profiler " // trim(prof_version())
-    write(error_unit, '(a)') "Timing information of the master watch """ // trim(profiler%mwatch%name) // """"
-    write(error_unit, '(a)') "Report created at " // trim(time_str) // " on " // trim(date_str) // " "  // trim(zone_str)
-    write(error_unit, '(a)')   ""
+    write(lunit, '(a)') "Profiler " // trim(prof_version())
+    write(lunit, '(a)') "Timing information of the master watch """ // trim(profiler%mwatch%name) // """"
+    write(lunit, '(a)') "Report created at " // trim(time_str) // " on " // trim(date_str) // " "  // trim(zone_str)
+    write(lunit, '(a)')   ""
     write(fmt, '("(a5, ", i0, "x, a4, ", i0, "x, 2x, a12, 6x, a)")') props%count_maxlen - 5 + 4, props%name_maxlen - 4
-    write(error_unit, fmt)     "Count", "Name", "Elapsed time", "Fraction"
+    write(lunit, fmt)     "Count", "Name", "Elapsed time", "Fraction"
     write(fmt, '("(a", i0, ")")') props%count_maxlen + 4 + props%name_maxlen + 2 + props%frac_maxlen + 2 + 16
-    write(error_unit, fmt)     line
+    write(lunit, fmt)     line
     
     write(fmt, '("(", i0, "x, a", i0, ", ", i0, "x, a)")')  &
          props%count_maxlen + 4, len_trim(profiler%mwatch%name), props%name_maxlen - len_trim(profiler%mwatch%name)+ 2
-    write(error_unit, fmt) profiler%mwatch%name, etime_str(profiler%mwatch, profiler%mwatch%etime, props%frac_maxlen)
+    write(lunit, fmt) profiler%mwatch%name, etime_str(profiler%mwatch, profiler%mwatch%etime, props%frac_maxlen)
     if (associated(profiler%mwatch%children)) then
-       call prof_summary_family(profiler%mwatch, props)
+       call prof_summary_family(profiler%mwatch, props, lunit)
     end if
   end subroutine prof_report_external
   !> \}
@@ -323,8 +330,20 @@ contains
   !> \brief Prints a report of the profiling results.
   !!
   !> \note It makes use of the internally defined profiler variable.
-  subroutine prof_report_internal()
-    call prof_report_external(prof_profiler)
+  subroutine prof_report_internal(unit)
+    use, intrinsic :: iso_fortran_env,  only: int32, error_unit
+
+    integer(int32), optional, intent(in) :: unit  !< File unit.
+
+    ! Locals
+    integer(int32) :: lunit
+
+    lunit = error_unit
+    if (present(unit)) then
+       lunit = unit
+    end if
+
+    call prof_report_external(prof_profiler, unit)
   end subroutine prof_report_internal
   !> \}
   
@@ -334,12 +353,13 @@ contains
   !> \brief Prints the summary report of all the child watches.
   !!
   !! \warning At the end the pointer to the child watches is nullified.
-  recursive subroutine prof_summary_family(watch, props)
-    use, intrinsic :: iso_fortran_env,  only: int32, int64, error_unit
+  recursive subroutine prof_summary_family(watch, props, unit)
+    use, intrinsic :: iso_fortran_env,  only: int32, int64
     use            :: profiler_types,   only: props_t, watch_t
     
-    type(watch_t),  target, intent(inout) :: watch  !< Watch.
-    type(props_t),          intent(in)    :: props  !< Layout properties of the report.
+    type(watch_t), target, intent(inout) :: watch  !< Watch.
+    type(props_t),         intent(in)    :: props  !< Layout properties of the report.
+    integer(int32),        intent(in)    :: unit   !< File unit.
 
     ! Locals
     integer(int32)         :: ichild
@@ -356,13 +376,14 @@ contains
        write(fmt, '("(""["", i", i0, ", ""]"", ", i0, "x, a", i0, ", ", i0, "x, a)")')  &
             props%count_maxlen, 2 * cwatch%generation, len_trim(cwatch%name),           &
             props%name_maxlen - len_trim(cwatch%name) - 2 * watch%generation + 2
-       write(error_unit, fmt) cwatch%nused, cwatch%name, etime_str(cwatch, watch%etime, props%frac_maxlen)
+       write(unit, fmt) cwatch%nused, cwatch%name, etime_str(cwatch, watch%etime, props%frac_maxlen)
           
        if (associated(cwatch%children)) then
-          call prof_summary_family(cwatch, props)
+          call prof_summary_family(cwatch, props, unit)
        end if
     end do
-    nullify(cwatch, watch%children)
+    if (associated(cwatch))  nullify(cwatch)
+    deallocate(watch%children)
     
     lwatch%name       = "(others)"
     lwatch%etime      = watch%etime - etime_others
@@ -371,7 +392,7 @@ contains
     write(fmt, '("(", i0, "x, a", i0, ", ", i0, "x, a)")')                        &
          props%count_maxlen + 2 * (watch%generation + 2), len_trim(lwatch%name),  &
          props%name_maxlen - len_trim(lwatch%name) - 2 * watch%generation + 2
-    write(error_unit, fmt) lwatch%name, etime_str(lwatch, watch%etime, props%frac_maxlen)
+    write(unit, fmt) lwatch%name, etime_str(lwatch, watch%etime, props%frac_maxlen)
   end subroutine prof_summary_family
   !> \}
   !> \endcond
