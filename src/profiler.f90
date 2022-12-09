@@ -434,7 +434,7 @@ contains
 
     ! Parameters
     real(real64),                   parameter :: THRESHOLD = 1000._real64
-    character(len=1), dimension(6), parameter :: PREFIX    = [ ' ', 'k', 'M', 'G', 'T', 'E' ]
+    character(len=2), dimension(6), parameter :: PREFIX    = [ '  ', 'ki', 'Mi', 'Gi', 'Ti', 'Ei' ]
 
     ! Locals
     integer(int32)         :: iunit, offset, frac_size
