@@ -29,6 +29,7 @@ module profiler
      module procedure prof_tic_external
      module procedure prof_tic_internal
   end interface prof_tic
+  !> \}
 
   !> \ingroup profiler
   !> \{
