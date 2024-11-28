@@ -7,7 +7,7 @@ cmake_policy(SET CMP0054 NEW)  # Only interpret if() arguments as variables or k
 cmake_policy(SET CMP0074 NEW)  # find_package() uses <PackageName>_ROOT variables
 
 # Project settings
-project(profiler VERSION 1.1.1 LANGUAGES Fortran)
+project(profiler VERSION 1.1.3 LANGUAGES Fortran)
 set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/${PROJECT_NAME}-${PROJECT_VERSION})
 
 # Options
