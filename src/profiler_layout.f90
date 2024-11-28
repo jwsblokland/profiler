@@ -48,28 +48,29 @@ contains
     type(watch_t),  intent(in)    :: watch        !< Watch.
 
     ! Locals
-    integer(int32)          :: ichild
     integer(int64)          :: etime_max, etime_sum
     type(watch_t),  pointer :: cwatch
 
     etime_max = 0
     etime_sum = 0
-    do ichild = 1, size(watch%children)
-       cwatch => watch%children(ichild)
-
-       etime_sum   = etime_sum + cwatch%etime
-       etime_max   = max(etime_max,   cwatch%etime)
-       nused_max   = max(nused_max,   cwatch%nused)
-       name_maxlen = max(name_maxlen, len_trim(cwatch%name) + 2 * cwatch%generation)
+    if (associated(watch%children)) then
+       cwatch => watch%children
+       do
+          etime_sum   = etime_sum + cwatch%etime
+          etime_max   = max(etime_max,   cwatch%etime)
+          nused_max   = max(nused_max,   cwatch%nused)
+          name_maxlen = max(name_maxlen, len_trim(cwatch%name) + 2 * cwatch%generation)
        
-       if (associated(cwatch%children)) then
-          call prof_layout_props_update(name_maxlen, frac_maxlen, nused_max, cwatch)
-       end if
-    end do
-    nullify(cwatch)
+          if (associated(cwatch%children)) then
+             call prof_layout_props_update(name_maxlen, frac_maxlen, nused_max, cwatch)
+          end if
+          
+          if (.not. associated(cwatch%sibling))  exit
+          cwatch => cwatch%sibling
+       end do
+       nullify(cwatch)
 
-    if (size(watch%children) > 0) then
-       etime_max   = max(etime_max, watch%etime - etime_sum)
+       etime_max = max(etime_max, watch%etime - etime_sum)
        if ((real(etime_max, real64) / real(watch%etime, real64)) < 0.99995) then
           frac_maxlen = max(frac_maxlen, 2 * watch%generation + 6)
        else

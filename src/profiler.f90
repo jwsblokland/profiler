@@ -88,6 +88,7 @@ contains
     profiler%cwatch%generation =  profiler%cwatch%generation + 1
     profiler%cwatch%nused      =  profiler%cwatch%nused      + 1
     nullify(profiler%cwatch%parent)
+    nullify(profiler%cwatch%sibling)
     call system_clock(count=profiler%cwatch%start)
   end subroutine prof_init_external
   !> \}
@@ -108,43 +109,45 @@ contains
     character(len=*), optional, intent(in)    :: unit      !< Base name of the unit.
     
     ! Locals
-    integer(int32)                       :: ichild, nchildren
-    type(watch_t), dimension(:), pointer :: children
+    logical                :: found
+    type(watch_t), pointer :: child, new_child
     
     if (.not. associated(profiler%cwatch%children)) then
        ! No children.
-       allocate(profiler%cwatch%children(1))
-       profiler%cwatch%children(1)%parent => profiler%cwatch
-       profiler%cwatch                    => profiler%cwatch%children(1)
-       profiler%cwatch%name               =  trim(name)
+       allocate(profiler%cwatch%children)
+       profiler%cwatch%children%parent => profiler%cwatch
+       profiler%cwatch                 => profiler%cwatch%children
+       profiler%cwatch%name            =  trim(name)
        if (present(unit))  profiler%cwatch%unit =  trim(unit)
-       profiler%cwatch%generation         =  profiler%cwatch%parent%generation + 1
+       profiler%cwatch%generation      =  profiler%cwatch%parent%generation + 1
     else
        ! Has children.
-       nchildren = size(profiler%cwatch%children)
-       do ichild = 1, nchildren
-          if (trim(name) == trim(profiler%cwatch%children(ichild)%name)) then
+       found =  .false.
+       child => profiler%cwatch%children
+       do 
+          if (trim(name) == trim(child%name)) then
              ! Existing child watch found.
-             profiler%cwatch => profiler%cwatch%children(ichild)
+             profiler%cwatch => child
+             found = .true.
              exit
           end if
+
+          if (.not. associated(child%sibling))  exit
+          child => child%sibling
        end do
-
-       if (ichild > nchildren) then
+       
+       if (.not. found) then
           ! New child watch.
-          allocate(children(nchildren + 1))
-          children(1:nchildren) = profiler%cwatch%children
-          nullify(profiler%cwatch%children)
-          profiler%cwatch%children => children
-          nullify(children)
+          allocate(new_child)
 
-          ! Set the parent of the new child watch.
-          profiler%cwatch%children(nchildren + 1)%parent => profiler%cwatch
-
-          profiler%cwatch            => profiler%cwatch%children(nchildren + 1)
-          profiler%cwatch%name       =  trim(name)
+          ! Initialize and set relations.
+          child%sibling        => new_child
+          new_child%parent     => profiler%cwatch
+          new_child%name       =  trim(name)
+          new_child%generation =  new_child%parent%generation + 1
           if (present(unit)) profiler%cwatch%unit = trim(unit)
-          profiler%cwatch%generation =  profiler%cwatch%parent%generation + 1
+
+          profiler%cwatch => new_child
        end if
     end if
     
@@ -363,16 +366,14 @@ contains
     integer(int32),        intent(in)    :: unit   !< File unit.
 
     ! Locals
-    integer(int32)         :: ichild
     integer(int64)         :: etime_others
     character(len=60)      :: fmt
     type(watch_t)          :: lwatch
-    type(watch_t), pointer :: cwatch
+    type(watch_t), pointer :: cwatch, cwatch_old
 
     etime_others = 0
-    do ichild = 1, size(watch%children)
-       cwatch => watch%children(ichild)
-
+    cwatch => watch%children
+    do
        etime_others = etime_others + cwatch%etime
        write(fmt, '("(""["", i", i0, ", ""]"", ", i0, "x, a", i0, ", ", i0, "x, a)")')  &
             props%count_maxlen, 2 * cwatch%generation, len_trim(cwatch%name),           &
@@ -382,9 +383,13 @@ contains
        if (associated(cwatch%children)) then
           call prof_summary_family(cwatch, props, unit)
        end if
+
+       if (.not. associated(cwatch%sibling))  exit
+       cwatch_old => cwatch
+       cwatch     => cwatch%sibling
+       deallocate(cwatch_old)
     end do
-    if (associated(cwatch))  nullify(cwatch)
-    deallocate(watch%children)
+    deallocate(cwatch)
     
     lwatch%name       = "(others)"
     lwatch%etime      = watch%etime - etime_others
