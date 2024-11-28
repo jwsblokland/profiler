@@ -1,10 +1,16 @@
 # Profiler library
 set(PROF_SRCDIR ${CMAKE_CURRENT_SOURCE_DIR})
-set(PROF_SRC profiler.f90
-             profiler_datetime.f90
-             profiler_layout.f90
-             profiler_types.f90
-	     profiler_version.f90)
+set(PROF_BINDIR ${CMAKE_CURRENT_BINARY_DIR})
+
+set(profiler_version_IN  ${PROF_SRCDIR}/profiler_version.f90.in)
+set(profiler_version_OUT ${PROF_BINDIR}/profiler_version.f90)
+configure_file(${profiler_version_IN} ${profiler_version_OUT} @ONLY)
+
+set(PROF_SRC ${PROF_SRCDIR}/profiler.f90
+             ${PROF_SRCDIR}/profiler_datetime.f90
+             ${PROF_SRCDIR}/profiler_layout.f90
+             ${PROF_SRCDIR}/profiler_types.f90
+	     ${PROF_BINDIR}/profiler_version.f90)
 
 # Add objects library.
 add_library(objects OBJECT ${PROF_SRC})
