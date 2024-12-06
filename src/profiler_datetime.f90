@@ -7,13 +7,6 @@ module profiler_datetime
   private
   public  :: prof_datetime
 
-  !> \ingroup versioni
-  !> \{
-  integer(int32), parameter :: PROFILER_MAJOR = 0 !@PROJECT_VERSION_MAJOR@
-  integer(int32), parameter :: PROFILER_MINOR = 1 !@PROJECT_VERSION_MINOR@
-  integer(int32), parameter :: PROFILER_PATCH = 0 !@PROJECT_VERSION_PATCH@
-  !> \}
-  
 contains
   !> \ingroup versioni
   !> \{
@@ -24,8 +17,8 @@ contains
     character(len=12) :: zone  !< Zone string formatted as (+h:mm UTC).
 
     ! Locals
-    integer(int32),  dimension(8) :: values
-    character(len=1)              :: sign_str
+    integer(int32),   dimension(8) :: values
+    character(len=1)               :: sign_str
 
     call date_and_time(values=values)
     sign_str = "+"
