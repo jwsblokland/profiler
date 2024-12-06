@@ -211,14 +211,14 @@ contains
     intrinsic :: exit
 
     ! Locals
-    integer(int32)                   :: lunit
-    integer(int64)                   :: end, count_rate, i
-    character(len=8)                 :: time_str
-    character(len=17)                :: date_str
-    character(len=12)                :: zone_str
-    character(len=60)                :: fmt
-    character(len=511)               :: line
-    type(props_t)                    :: props
+    integer(int32)     :: lunit
+    integer(int64)     :: end, count_rate, i
+    character(len=8)   :: time_str
+    character(len=17)  :: date_str
+    character(len=12)  :: zone_str
+    character(len=60)  :: fmt
+    character(len=511) :: line
+    type(props_t)      :: props
 
     lunit = error_unit
     if (present(unit)) then
@@ -361,9 +361,9 @@ contains
     use, intrinsic :: iso_fortran_env,  only: int32, int64
     use            :: profiler_types,   only: props_t, watch_t
     
-    type(watch_t), target, intent(inout) :: watch  !< Watch.
-    type(props_t),         intent(in)    :: props  !< Layout properties of the report.
-    integer(int32),        intent(in)    :: unit   !< File unit.
+    type(watch_t),  target, intent(inout) :: watch  !< Watch.
+    type(props_t),          intent(in)    :: props  !< Layout properties of the report.
+    integer(int32),         intent(in)    :: unit   !< File unit.
 
     ! Locals
     integer(int64)         :: etime_others
@@ -411,9 +411,9 @@ contains
     use, intrinsic :: iso_fortran_env,  only: int64,real64
     use            :: profiler_types,   only: watch_t
     
-    real(kind=real64),   intent(out) :: elapsed    !< Elapsed time in secondes.
-    real(kind=real64),   intent(out) :: data_rate  !< Data rate in \em unit per seconde.
-    type(watch_t),       intent(in)  :: watch      !< Watch.
+    real(kind=real64), intent(out) :: elapsed    !< Elapsed time in secondes.
+    real(kind=real64), intent(out) :: data_rate  !< Data rate in \em unit per seconde.
+    type(watch_t),     intent(in)  :: watch      !< Watch.
 
     ! Locals
     integer(int64) :: count_rate
@@ -433,10 +433,10 @@ contains
     use, intrinsic :: iso_fortran_env,  only: int32, int64, real64
     use            :: profiler_types,   only: STR_LEN, watch_t
     
-    type(watch_t),           intent(in) :: watch         !< Watch.
-    integer(int64),          intent(in) :: etime_parent  !< The total elapsed time of the parent watch.
-    integer(int32),          intent(in) :: frac_maxlen   !< Maximum string length to represent the elasped time as a fraction (including generation offset).
-    character(len=2*STR_LEN)            :: etime_str     !< Elapsed time and possibly data rate as a string.
+    type(watch_t),            intent(in) :: watch         !< Watch.
+    integer(int64),           intent(in) :: etime_parent  !< The total elapsed time of the parent watch.
+    integer(int32),           intent(in) :: frac_maxlen   !< Maximum string length to represent the elasped time as a fraction (including generation offset).
+    character(len=3*STR_LEN)             :: etime_str     !< Elapsed time and possibly data rate as a string.
 
     ! Parameters
     real(real64),                   parameter :: THRESHOLD = 1000._real64
