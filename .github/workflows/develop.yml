@@ -1,0 +1,57 @@
+name: develop
+
+on:
+  pull_request:
+    branches:
+      - develop
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install Doxygen and TeXlive
+        run: |
+          sudo apt update
+          sudo apt install doxygen texlive texlive-latex-extra
+
+      - name: profiler - Clone source
+        uses: actions/checkout@v4
+        with:
+          repository: 'jwsblokland/profiler'
+          fetch-depth: 0
+          path: 'profiler-src'
+
+      - name: profiler - Run CMake
+        run: >-
+          cmake
+          -DCMAKE_Fortran_COMPILER=gfortran
+          -DCMAKE_BUILD_TYPE:STRING=Debug
+          -DBUILD_DOC:BOOL=ON
+          -DBUILD_DOC_INTERNAL:BOOL=ON
+          -B ${{github.workspace}}/profiler-build
+          -S ${{github.workspace}}/profiler-src
+
+      - name: profiler - Build
+        run: >-
+          cmake
+          --build ${{github.workspace}}/profiler-build
+          --config Debug
+          --parallel
+
+      - name: profiler - Run all tests
+        run: >-
+          ctest
+          --verbose
+          --test-dir ${{github.workspace}}/profiler-build
+
+      - name: profiler - Install
+        run: >-
+          cmake
+          --install ${{github.workspace}}/profiler-build
+          --prefix ${{github.workspace}}/profiler-install
