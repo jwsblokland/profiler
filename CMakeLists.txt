@@ -33,6 +33,9 @@ endif ()
 # Add profiler library itself.
 add_subdirectory(src)
 
+# Testing
+enable_testing()
+
 # Add examples.
 add_subdirectory(examples)
 
